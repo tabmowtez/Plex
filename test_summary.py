@@ -5,7 +5,7 @@ from summary import PlexLibrary, _update_resolution_counts
 
 class TestPlexLibrary(unittest.TestCase):
 
-    @patch('plex.PlexServer')
+    @patch('summary.PlexServer')
     def setUp(self, mock_plex_server):
         self.mock_plex_server = mock_plex_server.return_value
         self.mock_movie_section = MagicMock()
@@ -24,7 +24,7 @@ class TestPlexLibrary(unittest.TestCase):
         self.assertEqual(self.plex_library.total_tv_shows, 0)
         self.assertEqual(self.plex_library.total_tv_seasons, 0)
 
-    @patch('plex._update_resolution_counts')
+    @patch('summary._update_resolution_counts')
     def test_tally_resolutions_movies(self, mock_update_resolution_counts):
         mock_movie = MagicMock()
         self.mock_movie_section.all.return_value = [mock_movie]
@@ -32,7 +32,7 @@ class TestPlexLibrary(unittest.TestCase):
         self.assertEqual(self.plex_library.total_movie_count, 0)
         mock_update_resolution_counts.assert_called_once_with(mock_movie, self.plex_library.movie_resolution_counts, "Movie")
 
-    @patch('plex._update_resolution_counts')
+    @patch('summary._update_resolution_counts')
     def test_tally_resolutions_tv_shows(self, mock_update_resolution_counts):
         mock_show = MagicMock()
         mock_season = MagicMock()
@@ -57,8 +57,8 @@ class TestPlexLibrary(unittest.TestCase):
         self.plex_library.print_summary()
         self.assertTrue(mock_print.called)
 
-    @patch('plex.PlexLibrary.tally_resolutions')
-    @patch('plex.PlexLibrary.print_summary')
+    @patch('summary.PlexLibrary.tally_resolutions')
+    @patch('summary.PlexLibrary.print_summary')
     def test_run(self, mock_print_summary, mock_tally_resolutions):
         mock_tally_resolutions.side_effect = [999, 11323]
         self.plex_library.run()
