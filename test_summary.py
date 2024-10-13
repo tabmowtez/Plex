@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import patch, MagicMock
-from plex import PlexLibrary, _update_resolution_counts
+from summary import PlexLibrary, _update_resolution_counts
 
 
 class TestPlexLibrary(unittest.TestCase):

@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 import os
+
 from dotenv import load_dotenv
 from plexapi.server import PlexServer
 
 # Load environment variables from .env file
 load_dotenv()
+
 
 def _update_resolution_counts(item, resolution_counts, item_type, show_title=None):
     """
@@ -75,6 +77,7 @@ class PlexLibrary:
         """
         Print a right aligned summary of the resolution counts for Movies and TV Shows.
         """
+
         def ctz(num):
             return f"{num:,}"
 
