@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import logging
 import os
 
 from dotenv import load_dotenv
@@ -6,6 +7,10 @@ from plexapi.server import PlexServer
 
 # Load environment variables from .env file
 load_dotenv()
+
+# Set the logging level based on the environment variable
+log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
+logging.basicConfig(level=getattr(logging, log_level, logging.INFO))
 
 
 def _update_resolution_counts(item, resolution_counts, item_type, show_title=None):
@@ -23,10 +28,11 @@ def _update_resolution_counts(item, resolution_counts, item_type, show_title=Non
     if resolution not in resolution_counts:
         resolution_counts[resolution] = 0
     resolution_counts[resolution] += 1
-    if show_title:
-        print(f"{item_type}: {show_title} - {item.title} ({resolution} - {resolution_info})")
-    else:
-        print(f"{item_type}: {item.title} ({resolution} - {resolution_info})")
+    if logging.getLogger().isEnabledFor(logging.DEBUG):
+        if show_title:
+            print(f"{item_type}: {show_title} - {item.title} ({resolution} - {resolution_info})")
+        else:
+            print(f"{item_type}: {item.title} ({resolution} - {resolution_info})")
 
 
 class PlexLibrary:
@@ -81,11 +87,11 @@ class PlexLibrary:
         def ctz(num):
             return f"{num:,}"
 
-        # Create label strings for movies and TV shows
-        movie_labels = [f"{resolution.upper() if resolution else 'None'} Movies" for resolution in
-                        self.movie_resolution_counts]
-        tv_labels = [f"{resolution.upper() if resolution else 'None'} TV Episodes" for resolution in
-                     self.tv_resolution_counts]
+        # Create label strings for Movies and TV shows
+        movie_labels = [f"{resolution.upper() + 'P' if resolution and resolution.isdigit() else resolution.upper()
+            if resolution else 'None'} Movies:" for resolution in self.movie_resolution_counts]
+        tv_labels = [f"{resolution.upper() + 'P' if resolution and resolution.isdigit() else resolution.upper()
+            if resolution else 'None'} TV Episodes:" for resolution in self.tv_resolution_counts]
 
         # Find the maximum label width across both movies and TV sections
         max_label_width = max(len("Total TV Episodes "), max(len(label) for label in movie_labels + tv_labels))
@@ -121,4 +127,5 @@ if __name__ == "__main__":
     plex_url = os.getenv('PLEX_URL', 'http://localhost:32400')
     plex_token = os.getenv('PLEX_TOKEN', 'default-token')
     plex_library = PlexLibrary(plex_url, plex_token)
+    print(f"Retrieving Library data from Plex instance at: {plex_url}")
     plex_library.run()
