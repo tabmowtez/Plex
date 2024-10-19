@@ -98,6 +98,20 @@ class PlexLibrary:
         def ctz(num):
             return f"{num:,}"
 
+        def resolution_sort_key(resolution):
+            if resolution is None:
+                return -1
+            if 'k' in resolution.lower():
+                return int(resolution.lower().replace('k', '')) * 1000
+            try:
+                return int(resolution)
+            except ValueError:
+                return {
+                    'sd': 0,
+                    'hd': 1,
+                    'uhd': 2
+                }.get(resolution.lower(), -1)
+
         def print_library_summary(sum_library_name, sum_labels, sum_counts):
             # Print the library name and resolution summary with aligned labels and counts
             print(f"\n{'Library:':<{max_label_width}} {sum_library_name.rjust(max_count_width)}")
@@ -117,13 +131,16 @@ class PlexLibrary:
                     ctz(self.total_counts[library_name]['total_seasons'])
                 ])
 
+            # Sort resolutions by highest to lowest
+            sorted_resolutions = sorted(resolution_counts.keys(), key=resolution_sort_key, reverse=True)
+
             # Add resolution labels
-            resolution_labels = [f"{resolution.upper() + 'P' if resolution and resolution.isdigit() else resolution.upper() 
-                if resolution else 'None'}:" for resolution in resolution_counts]
+            resolution_labels = [f"{resolution.upper() + 'P' if resolution and resolution.isdigit() else resolution.upper()
+                if resolution else 'None'}:" for resolution in sorted_resolutions]
             labels.extend(resolution_labels)
 
             # Add resolution counts
-            resolution_counts_list = list(map(ctz, resolution_counts.values()))
+            resolution_counts_list = [ctz(resolution_counts[resolution]) for resolution in sorted_resolutions]
             counts.extend(resolution_counts_list)
 
             # Find the maximum label width
