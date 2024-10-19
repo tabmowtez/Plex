@@ -91,31 +91,50 @@ class PlexLibrary:
 
     def print_summary(self):
         """
-        Print a right aligned summary of the resolution counts for all libraries.
+        Print a right-aligned summary of the resolution counts for all libraries,
+        ensuring that Series and Seasons come directly after the Total line in the summary.
         """
 
         def ctz(num):
             return f"{num:,}"
 
         def print_library_summary(sum_library_name, sum_labels, sum_counts):
+            # Print the library name and resolution summary with aligned labels and counts
             print(f"\n{'Library:':<{max_label_width}} {sum_library_name.rjust(max_count_width)}")
             for label, count in zip(sum_labels, sum_counts):
-                    print(f"{label:<{max_label_width}} {count.rjust(max_count_width)}")
+                print(f"{label:<{max_label_width}} {count.rjust(max_count_width)}")
 
         for library_name, resolution_counts in self.resolution_counts.items():
-            # Create label strings for the library
-            labels = [f"{resolution.upper() + 'P' if resolution and resolution.isdigit() else resolution.upper() 
+            # Create label strings for the resolutions
+            labels = ["Total:"]  # Start with "Total:"
+            counts = [ctz(self.total_counts[library_name]['total_items'])]  # Start with total item count
+
+            # Add "Series" and "Seasons" right after "Total" if the library is a TV show library
+            if self.libraries[library_name].type == "show":
+                labels.extend(["Series:", "Seasons:"])
+                counts.extend([
+                    ctz(self.total_counts[library_name]['total_shows']),
+                    ctz(self.total_counts[library_name]['total_seasons'])
+                ])
+
+            # Add resolution labels
+            resolution_labels = [f"{resolution.upper() + 'P' if resolution and resolution.isdigit() else resolution.upper() 
                 if resolution else 'None'}:" for resolution in resolution_counts]
+            labels.extend(resolution_labels)
+
+            # Add resolution counts
+            resolution_counts_list = list(map(ctz, resolution_counts.values()))
+            counts.extend(resolution_counts_list)
 
             # Find the maximum label width
-            max_label_width = max(len("Total Items "), max(len(label) for label in labels))
+            max_label_width = max(len("Library: "), max(len(label) for label in labels))
 
-            # Convert counts to strings with commas and find the maximum width for counts
-            counts = list(map(ctz, [self.total_counts[library_name]['total_items']] + list(resolution_counts.values())))
+            # Find the maximum width for counts (including library name)
             max_count_width = max(len(library_name), max(len(count) for count in counts))
 
             # Print library summary with aligned labels and counts
-            print_library_summary(library_name, ["Total Items:"] + labels, counts)
+            print_library_summary(library_name, labels, counts)
+
 
     def run(self):
         """
