@@ -10,27 +10,29 @@ class TestPlexLibrary(unittest.TestCase):
         self.mock_plex_server = mock_plex_server.return_value
         self.mock_movie_section = MagicMock()
         self.mock_tv_section = MagicMock()
-        self.mock_plex_server.library.section.side_effect = [self.mock_movie_section, self.mock_tv_section]
-        self.plex_library = PlexLibrary('http://mockurl', 'mocktoken')
+        self.mock_plex_server.library.sections.return_value = [self.mock_movie_section, self.mock_tv_section]
+        self.mock_movie_section.type = "movie"
+        self.mock_tv_section.type = "show"
+        self.mock_movie_section.title = "Movies"
+        self.mock_tv_section.title = "TV Shows"
+        self.plex_library = PlexLibrary('http://mockurl', 'mock token')
 
     def test_init(self):
         self.assertEqual(self.plex_library.plex, self.mock_plex_server)
-        self.assertEqual(self.plex_library.movie_library, self.mock_movie_section)
-        self.assertEqual(self.plex_library.tv_library, self.mock_tv_section)
-        self.assertEqual(self.plex_library.movie_resolution_counts, {})
-        self.assertEqual(self.plex_library.tv_resolution_counts, {})
-        self.assertEqual(self.plex_library.total_movie_count, 0)
-        self.assertEqual(self.plex_library.total_tv_count, 0)
-        self.assertEqual(self.plex_library.total_tv_shows, 0)
-        self.assertEqual(self.plex_library.total_tv_seasons, 0)
+        self.assertIn("Movies", self.plex_library.libraries)
+        self.assertIn("TV Shows", self.plex_library.libraries)
+        self.assertEqual(self.plex_library.resolution_counts["Movies"], {})
+        self.assertEqual(self.plex_library.resolution_counts["TV Shows"], {})
+        self.assertEqual(self.plex_library.total_counts["Movies"], {'total_items': 0, 'total_shows': 0, 'total_seasons': 0})
+        self.assertEqual(self.plex_library.total_counts["TV Shows"], {'total_items': 0, 'total_shows': 0, 'total_seasons': 0})
 
     @patch('summary._update_resolution_counts')
     def test_tally_resolutions_movies(self, mock_update_resolution_counts):
         mock_movie = MagicMock()
         self.mock_movie_section.all.return_value = [mock_movie]
-        self.plex_library.tally_resolutions(self.mock_movie_section, self.plex_library.movie_resolution_counts, "Movie")
-        self.assertEqual(self.plex_library.total_movie_count, 0)
-        mock_update_resolution_counts.assert_called_once_with(mock_movie, self.plex_library.movie_resolution_counts, "Movie")
+        self.plex_library.tally_resolutions("Movies", self.mock_movie_section)
+        self.assertEqual(self.plex_library.total_counts["Movies"]['total_items'], 1)
+        mock_update_resolution_counts.assert_called_once_with(mock_movie, self.plex_library.resolution_counts["Movies"], "Movie")
 
     @patch('summary._update_resolution_counts')
     def test_tally_resolutions_tv_shows(self, mock_update_resolution_counts):
@@ -40,30 +42,31 @@ class TestPlexLibrary(unittest.TestCase):
         mock_show.seasons.return_value = [mock_season]
         mock_show.episodes.return_value = [mock_episode]
         self.mock_tv_section.all.return_value = [mock_show]
-        self.plex_library.tally_resolutions(self.mock_tv_section, self.plex_library.tv_resolution_counts, "TV Shows")
-        self.assertEqual(self.plex_library.total_tv_shows, 1)
-        self.assertEqual(self.plex_library.total_tv_seasons, 1)
-        self.assertEqual(self.plex_library.total_tv_count, 0)
-        mock_update_resolution_counts.assert_called_once_with(mock_episode, self.plex_library.tv_resolution_counts, "TV Shows", mock_show.title)
+        self.plex_library.tally_resolutions("TV Shows", self.mock_tv_section)
+        self.assertEqual(self.plex_library.total_counts["TV Shows"]['total_shows'], 1)
+        self.assertEqual(self.plex_library.total_counts["TV Shows"]['total_seasons'], 1)
+        self.assertEqual(self.plex_library.total_counts["TV Shows"]['total_items'], 1)
+        mock_update_resolution_counts.assert_called_once_with(mock_episode, self.plex_library.resolution_counts["TV Shows"], "TV Show", mock_show.title)
 
     @patch('builtins.print')
     def test_print_summary(self, mock_print):
-        self.plex_library.total_movie_count = 999
-        self.plex_library.movie_resolution_counts = {'1080': 570, '720': 177, '480': 112, '4k': 127, '576': 13}
-        self.plex_library.total_tv_shows = 129
-        self.plex_library.total_tv_seasons = 636
-        self.plex_library.total_tv_count = 11323
-        self.plex_library.tv_resolution_counts = {'720': 2398, '1080': 6089, 'sd': 2435, '576': 2, '480': 275, '4k': 122, None: 2}
+        self.plex_library.total_counts = {
+            "Movies": {'total_items': 999, 'total_shows': 0, 'total_seasons': 0},
+            "TV Shows": {'total_items': 11323, 'total_shows': 129, 'total_seasons': 636}
+        }
+        self.plex_library.resolution_counts = {
+            "Movies": {'1080': 570, '720': 177, '480': 112, '4k': 127, '576': 13},
+            "TV Shows": {'720': 2398, '1080': 6089, 'sd': 2435, '576': 2, '480': 275, '4k': 122, None: 2}
+        }
         self.plex_library.print_summary()
         self.assertTrue(mock_print.called)
 
     @patch('summary.PlexLibrary.tally_resolutions')
     @patch('summary.PlexLibrary.print_summary')
     def test_run(self, mock_print_summary, mock_tally_resolutions):
-        mock_tally_resolutions.side_effect = [999, 11323]
         self.plex_library.run()
-        mock_tally_resolutions.assert_any_call(self.mock_movie_section, self.plex_library.movie_resolution_counts, "Movie")
-        mock_tally_resolutions.assert_any_call(self.mock_tv_section, self.plex_library.tv_resolution_counts, "TV Shows")
+        mock_tally_resolutions.assert_any_call("Movies", self.mock_movie_section)
+        mock_tally_resolutions.assert_any_call("TV Shows", self.mock_tv_section)
         mock_print_summary.assert_called_once()
 
     def test_update_resolution_counts_with_movie(self):

@@ -45,81 +45,84 @@ class PlexLibrary:
             token (str): The authentication token for the Plex server.
         """
         self.plex = PlexServer(baseurl, token)
-        self.movie_library = self.plex.library.section('Movies')
-        self.tv_library = self.plex.library.section('TV Shows')
-        self.movie_resolution_counts = {}
-        self.tv_resolution_counts = {}
-        self.total_movie_count = 0
-        self.total_tv_count = 0
-        self.total_tv_shows = 0
-        self.total_tv_seasons = 0
+        self.libraries = {}
+        self.resolution_counts = {}
+        self.total_counts = {}
+        self.get_libraries()
 
-    def tally_resolutions(self, library, resolution_counts, item_type):
+    def get_libraries(self):
         """
-        Tally the resolutions of all items in the given library section.
+        Retrieve and categorize all libraries from the Plex server.
+        """
+        for library in self.plex.library.sections():
+            if library.type in ["movie", "show"]:
+                self.libraries[library.title] = library
+                self.resolution_counts[library.title] = {}
+                self.total_counts[library.title] = {
+                    'total_items': 0,
+                    'total_shows': 0,
+                    'total_seasons': 0
+                }
+
+    def tally_resolutions(self, library_name, library):
+        """
+        Tally the resolutions of all items in the given library.
 
         Args:
+            library_name (str): The name of the library.
             library (plexapi.library.LibrarySection): The library section to tally.
-            resolution_counts (dict): Dictionary to store resolution counts.
-            item_type (str): Type of the items in the library (e.g., 'Movies', 'TV Shows').
 
         Returns:
-            int: The total count of items in the library section.
+            int: The total count of items in the library.
         """
         total_count = 0
         for item in library.all():
-            if item_type == "TV Shows":
-                self.total_tv_shows += 1
-                self.total_tv_seasons += len(item.seasons())
+            if library.type == "show":
+                self.total_counts[library_name]['total_shows'] += 1
+                self.total_counts[library_name]['total_seasons'] += len(item.seasons())
                 for episode in item.episodes():
                     total_count += 1
-                    _update_resolution_counts(episode, resolution_counts, item_type, item.title)
+                    _update_resolution_counts(episode, self.resolution_counts[library_name], "TV Show", item.title)
             else:
                 total_count += 1
-                _update_resolution_counts(item, resolution_counts, item_type)
+                _update_resolution_counts(item, self.resolution_counts[library_name], "Movie")
+        self.total_counts[library_name]['total_items'] = total_count
         return total_count
 
     def print_summary(self):
         """
-        Print a right aligned summary of the resolution counts for Movies and TV Shows.
+        Print a right aligned summary of the resolution counts for all libraries.
         """
 
         def ctz(num):
             return f"{num:,}"
 
-        # Create label strings for Movies and TV shows
-        movie_labels = [f"{resolution.upper() + 'P' if resolution and resolution.isdigit() else resolution.upper()
-            if resolution else 'None'} Movies:" for resolution in self.movie_resolution_counts]
-        tv_labels = [f"{resolution.upper() + 'P' if resolution and resolution.isdigit() else resolution.upper()
-            if resolution else 'None'} TV Episodes:" for resolution in self.tv_resolution_counts]
+        def print_library_summary(sum_library_name, sum_labels, sum_counts):
+            print(f"\n{'Library:':<{max_label_width}} {sum_library_name.rjust(max_count_width)}")
+            for label, count in zip(sum_labels, sum_counts):
+                    print(f"{label:<{max_label_width}} {count.rjust(max_count_width)}")
 
-        # Find the maximum label width across both movies and TV sections
-        max_label_width = max(len("Total TV Episodes "), max(len(label) for label in movie_labels + tv_labels))
+        for library_name, resolution_counts in self.resolution_counts.items():
+            # Create label strings for the library
+            labels = [f"{resolution.upper() + 'P' if resolution and resolution.isdigit() else resolution.upper() 
+                if resolution else 'None'}:" for resolution in resolution_counts]
 
-        # Convert counts to strings with commas and find the maximum width for counts
-        movie_counts = list(map(ctz, [self.total_movie_count] + list(self.movie_resolution_counts.values())))
-        tv_counts = list(map(ctz, [self.total_tv_shows, self.total_tv_seasons, self.total_tv_count] + list(
-            self.tv_resolution_counts.values())))
-        max_count_width = max(len(count) for count in movie_counts + tv_counts)
+            # Find the maximum label width
+            max_label_width = max(len("Total Items "), max(len(label) for label in labels))
 
-        # Print movie summary with aligned labels and counts
-        print(f"\n{'Total Movies:':<{max_label_width}} {movie_counts[0].rjust(max_count_width)}")
-        for label, count in zip(movie_labels, movie_counts[1:]):
-            print(f"{label:<{max_label_width}} {count.rjust(max_count_width)}")
+            # Convert counts to strings with commas and find the maximum width for counts
+            counts = list(map(ctz, [self.total_counts[library_name]['total_items']] + list(resolution_counts.values())))
+            max_count_width = max(len(library_name), max(len(count) for count in counts))
 
-        # Print TV summary with aligned labels and counts
-        print(f"\n{'Total TV Shows:':<{max_label_width}} {tv_counts[0].rjust(max_count_width)}")
-        print(f"{'Total TV Seasons:':<{max_label_width}} {tv_counts[1].rjust(max_count_width)}")
-        print(f"{'Total TV Episodes:':<{max_label_width}} {tv_counts[2].rjust(max_count_width)}")
-        for label, count in zip(tv_labels, tv_counts[3:]):
-            print(f"{label:<{max_label_width}} {count.rjust(max_count_width)}")
+            # Print library summary with aligned labels and counts
+            print_library_summary(library_name, ["Total Items:"] + labels, counts)
 
     def run(self):
         """
         Run the resolution tallying and print the summary.
         """
-        self.total_movie_count = self.tally_resolutions(self.movie_library, self.movie_resolution_counts, "Movie")
-        self.total_tv_count = self.tally_resolutions(self.tv_library, self.tv_resolution_counts, "TV Shows")
+        for library_name, library in self.libraries.items():
+            self.tally_resolutions(library_name, library)
         self.print_summary()
 
 
